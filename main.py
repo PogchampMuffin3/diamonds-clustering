@@ -2,8 +2,9 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
 
-OFFICIAL = 1
+SAVE_PLOTS = True  # Set to False to display plots interactively instead of saving
 
 df = pd.read_csv('diamonds.csv')
 
@@ -11,7 +12,7 @@ df = pd.read_csv('diamonds.csv')
 df = df[(df['x'] > 0) & (df['y'] > 0) & (df['z'] > 0)]
 
 #region wstępne wykresy
-if OFFICIAL:
+if SAVE_PLOTS:
     output_folder = 'wykresy'
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -127,12 +128,6 @@ df_scaled = scaler.fit_transform(df[features])
 # Przekształcamy do DataFrame
 df_scaled = pd.DataFrame(df_scaled, columns=features)
 
-print(df_scaled.head())  # Sprawdzenie wyników
-
-
-
-
-
 
 
 print(df_scaled.head())  # Podgląd pierwszych 5 wierszy
@@ -140,14 +135,6 @@ print(df_scaled.info())  # Sprawdzenie typów danych i braków
 print(df_scaled.describe())  # Statystyki opisowe
 
 
-
-
-
-
-
-
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 
 wcss = []  # Suma błędów wewnątrz klastrów (Within-Cluster Sum of Squares)
 
