@@ -35,7 +35,7 @@ The dataset contains 53 940 diamonds described by 10 features. 20 records with x
 | `price` | Price in USD |
 | `x`, `y`, `z` | Physical dimensions (mm) |
 
-Download: [diamonds.csv from Kaggle](https://www.kaggle.com/datasets/shivam2503/diamonds)
+Download: [diamonds.csv on Kaggle](https://www.kaggle.com/datasets/shivam2503/diamonds)
 
 ---
 
