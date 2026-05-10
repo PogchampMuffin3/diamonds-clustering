@@ -82,7 +82,7 @@ Generated plots are saved to the `wykresy/` folder:
 | K-Means — full dataset | Ward — 10k sample |
 |:---:|:---:|
 | ![K-Means clustering: carat vs price](assets/K-Means_carat_price.png) | ![Ward clustering: carat vs price](assets/Ward_carat_price.png) |
-*K-Means achieved 69.86% overlap with price quantile groups; Ward 37.78% (on 10k sample).*
+*69.86% overlap with price quantile groups | 37.78% overlap with price quantile groups (on 10k sample).*
 
 ---
 
