@@ -2,33 +2,34 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
 from sklearn.cluster import KMeans, AgglomerativeClustering
 
-GENERATE_CHARTS = 0
-COUNT_CLUSTERS = 0
-ANALYSIS_METHODS = 0
+GENERATE_CHARTS = True
+COUNT_CLUSTERS = True
+ANALYSIS_METHODS = True
 
 df = pd.read_csv('diamonds.csv')
-output_folder = 'wykresy'
+output_folder = 'output'
 
 #usunięcie x,y,z = 0
 original_count = df.shape[0]
 df = df[(df['x'] > 0) & (df['y'] > 0) & (df['z'] > 0)]
-delated = original_count-df.shape[0]
-print(f"Usunieto {delated} wierszy")
-print(f"Usunieto {delated/original_count*100}% wierszy")
+removed = original_count-df.shape[0]
+print(f"Usunieto {removed} wierszy")
+print(f"Usunieto {removed/original_count*100}% wierszy")
 
 #region wstępne wykresy
 if GENERATE_CHARTS:
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
-    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns[1:]
+    categorical_cols = df.select_dtypes(include=['str', 'category']).columns
 
-    for col in numeric_cols[1:]:
+    for col in numeric_cols:
         fig, ax = plt.subplots(figsize=(6, 4))
         ax.hist(df[col].dropna(), bins=30, color='skyblue', edgecolor='black')
         ax.grid(axis='y', linestyle='-', alpha=0.6)
@@ -75,7 +76,7 @@ if GENERATE_CHARTS:
         fig.savefig(os.path.join(output_folder, f'pie_{col}.png'))
         plt.close(fig)
 
-    summary = df[numeric_cols[1:]].agg(['min', 'max', 'mean', 'median', 'std', 'skew']).transpose().round(8)
+    summary = df[numeric_cols].agg(['min', 'max', 'mean', 'median', 'std', 'skew']).transpose().round(8)
     fig, ax = plt.subplots(figsize=(10, 3))
     ax.axis('tight')
     ax.axis('off')
@@ -124,7 +125,7 @@ clarity_mapping = {
 df['cut'] = df['cut'].map(cut_mapping)
 df['color'] = df['color'].map(color_mapping)
 df['clarity'] = df['clarity'].map(clarity_mapping)
-#endregion0.0148
+#endregion
 
 #dodanie przedziałów cenowych (kwantyle)
 df['price_category'] = pd.qcut(df['price'], q=3, labels=[3,2,1])
@@ -136,6 +137,8 @@ df_cluster = df[features].copy()
 
 scaler = StandardScaler()
 df_cluster_scaled = scaler.fit_transform(df_cluster)
+WARD_IDX = np.random.RandomState(42).choice(len(df_cluster_scaled), 10000, replace=False)
+ward_data = df_cluster_scaled[WARD_IDX]
 #endregion
 
 #region obliczanie optymalnej ilości klastrów
@@ -162,7 +165,7 @@ if COUNT_CLUSTERS:
         print(f'Licze: {k}')
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
         labels = kmeans.fit_predict(df_cluster_scaled)
-        score = silhouette_score(df_cluster_scaled, labels)
+        score = silhouette_score(df_cluster_scaled, labels, sample_size=10000, random_state=42)
         silhouette_scores_kmeans.append(score)
         print(f'KMeans - Liczba klastrów: {k}, Silhouette Score: {score:.4f}')
 
@@ -180,8 +183,8 @@ if COUNT_CLUSTERS:
     for k in range(2, 11):
         print(f'Licze: {k}')
         ward = AgglomerativeClustering(n_clusters=k, linkage='ward')
-        labels = ward.fit_predict(df_cluster_scaled)
-        score = silhouette_score(df_cluster_scaled, labels)
+        labels = ward.fit_predict(ward_data)
+        score = silhouette_score(ward_data, labels)
         silhouette_scores_ward.append(score)
         print(f'Ward - Liczba klastrów: {k}, Silhouette Score: {score:.4f}')
 
@@ -201,25 +204,29 @@ kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
 df['cluster_kmeans'] = kmeans.fit_predict(df_cluster_scaled)
 
 ward = AgglomerativeClustering(n_clusters=3, linkage='ward')
-df['cluster_ward'] = ward.fit_predict(df_cluster_scaled)
+ward_labels_sample = ward.fit_predict(ward_data)
+df_ward = df.iloc[WARD_IDX].copy()
+df_ward['cluster_ward'] = ward_labels_sample
 
 cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
 df['kmeans_color'] = df['cluster_kmeans'].map(cluster_colors)
 cluster_colors = {0: 'blue', 1: 'red', 2: 'green'}
-df['ward_color'] = df['cluster_ward'].map(cluster_colors)
+df_ward['ward_color'] = df_ward['cluster_ward'].map(cluster_colors)
 cluster_colors = {1: 'green', 2: 'blue', 3: 'red'}
 df['price_color'] = df['price_category'].map(cluster_colors)
+df_ward['price_color'] = df_ward['price_category'].map(cluster_colors)
 #endregion
 
 #region obliczanie pokrycia
 df['kmeans_vs_cena_match'] = df['kmeans_color'] == df['price_color']
-df['ward_vs_cena_match'] = df['ward_color'] == df['price_color']
+df_ward['ward_vs_cena_match'] = df_ward['ward_color'] == df_ward['price_color']
 print(f"Pokrycie KMeans: {df['kmeans_vs_cena_match'].mean()*100}")
-print(f"Pokrycie Ward: {df['ward_vs_cena_match'].mean()*100}")
+print(f"Pokrycie Ward (próbka 10k): {df_ward['ward_vs_cena_match'].mean()*100}")
 #endregion
 
 #region wizualizacja
-def make_plots(x,y):    #x i y to nazywy kolumn
+def make_plots(x,y, ward_df=None):    #x i y to nazywy kolumn
+    # KMeans - pełny zbiór
     cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
     plt.figure(figsize=(10, 5))
     sns.scatterplot(x=df[x], y=df[y], hue=df['cluster_kmeans'], palette=cluster_colors, alpha=0.1, edgecolors='none')
@@ -228,14 +235,14 @@ def make_plots(x,y):    #x i y to nazywy kolumn
     plt.savefig(os.path.join(output_folder, f'K-Means_{x}_{y}.png'))
     plt.close()
 
-
-    cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
-    plt.figure(figsize=(10, 5))
-    sns.scatterplot(x=df[x], y=df[y], hue=df['cluster_ward'], palette=cluster_colors, alpha=0.1, edgecolors='none')
-    plt.title(f'Ward: Klasyfikacja diamentów na podstawie {x} vs {y}')
-    plt.legend(title='Cluster')
-    plt.savefig(os.path.join(output_folder, f'Ward_{x}_{y}.png'))
-    plt.close()
+    # Ward — próbka 10k
+    if ward_df is not None:
+        plt.figure(figsize=(10, 5))
+        sns.scatterplot(x=ward_df[x], y=ward_df[y], hue=ward_df['cluster_ward'], palette=cluster_colors, alpha=0.1, edgecolors='none')
+        plt.title(f'Ward: Klasyfikacja diamentów na podstawie {x} vs {y} (próbka 10k)')
+        plt.legend(title='Cluster')
+        plt.savefig(os.path.join(output_folder, f'Ward_{x}_{y}.png'))
+        plt.close()
 
     cluster_colors = {1: 'green', 2: 'blue', 3: 'red'}
     plt.figure(figsize=(10, 5))
@@ -245,6 +252,9 @@ def make_plots(x,y):    #x i y to nazywy kolumn
     plt.savefig(os.path.join(output_folder, f'Wykresy_borderless{x}_{y}.png'))
     plt.close()
 
-make_plots('carat','price')
+for f in numeric_cols:
+    for s in numeric_cols:
+        if f==s: continue
+        make_plots(f,s, ward_df=df_ward)
 
 #endregion
