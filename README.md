@@ -121,6 +121,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Set `SAVE_PLOTS = False` in `main.py` to display plots interactively instead of saving them to files.
-
-
+Set `GENERATE_CHARTS = True` in `main.py` to save EDA charts instead of displaying them.
+Set `COUNT_CLUSTERS = True` in `main.py` to run the elbow method and Silhouette Score analysis for K-Means and Ward, saving the resulting charts.
+Set `ANALYSIS_METHODS = True` in `main.py` to run K-Means and Ward clustering, compute price group overlap, and generate scatter plots for all numeric feature pairs. Set to False to skip this step.
