@@ -1,0 +1,4 @@
+wykresy/
+__pycache__/
+*.pyc
+.idea

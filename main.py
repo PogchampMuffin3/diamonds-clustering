@@ -1,19 +1,27 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.cluster import KMeans, AgglomerativeClustering
 
-SAVE_PLOTS = True  # Set to False to display plots interactively instead of saving
+GENERATE_CHARTS = 0
+COUNT_CLUSTERS = 0
+ANALYSIS_METHODS = 0
 
 df = pd.read_csv('diamonds.csv')
+output_folder = 'wykresy'
 
 #usunięcie x,y,z = 0
+original_count = df.shape[0]
 df = df[(df['x'] > 0) & (df['y'] > 0) & (df['z'] > 0)]
+delated = original_count-df.shape[0]
+print(f"Usunieto {delated} wierszy")
+print(f"Usunieto {delated/original_count*100}% wierszy")
 
 #region wstępne wykresy
-if SAVE_PLOTS:
-    output_folder = 'wykresy'
+if GENERATE_CHARTS:
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
@@ -67,8 +75,8 @@ if SAVE_PLOTS:
         fig.savefig(os.path.join(output_folder, f'pie_{col}.png'))
         plt.close(fig)
 
-    summary = df[numeric_cols[1:]].agg(['min', 'max', 'mean']).transpose()
-    fig, ax = plt.subplots(figsize=(10, len(numeric_cols) * 0.5 + 1))
+    summary = df[numeric_cols[1:]].agg(['min', 'max', 'mean', 'median', 'std', 'skew']).transpose().round(8)
+    fig, ax = plt.subplots(figsize=(10, 3))
     ax.axis('tight')
     ax.axis('off')
     table = ax.table(cellText=summary.values,
@@ -78,10 +86,11 @@ if SAVE_PLOTS:
                      loc='center')
     table.auto_set_font_size(False)
     table.set_fontsize(10)
-    ax.set_title('Podsumowanie statystyczne (min, max, średnia)', fontweight="bold")
+    ax.set_title('Podsumowanie statystyczne (min, max, średnia, mediana, odchylenie standardowe, skośność)', fontweight="bold")
 
     fig.savefig(os.path.join(output_folder, 'statystyki_podsumowanie.png'))
     plt.close(fig)
+
 #endregion
 
 #region zamiana jakościowych na ilościowe
@@ -115,38 +124,127 @@ clarity_mapping = {
 df['cut'] = df['cut'].map(cut_mapping)
 df['color'] = df['color'].map(color_mapping)
 df['clarity'] = df['clarity'].map(clarity_mapping)
+#endregion0.0148
+
+#dodanie przedziałów cenowych (kwantyle)
+df['price_category'] = pd.qcut(df['price'], q=3, labels=[3,2,1])
+df['index'] = df.index
+
+#region skalowanie
+features = ['carat', 'cut', 'color', 'clarity', 'x', 'y', 'z', 'depth', 'table']
+df_cluster = df[features].copy()
+
+scaler = StandardScaler()
+df_cluster_scaled = scaler.fit_transform(df_cluster)
 #endregion
 
+#region obliczanie optymalnej ilości klastrów
+if COUNT_CLUSTERS:
+    #KMeans - łokieć
+    wcss = []
+    for k in range(1, 11):
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans.fit(df_cluster_scaled)
+        wcss.append(kmeans.inertia_)
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(range(1, 11), wcss, marker='o')
+    plt.title('KMeans – Metoda łokcia')
+    plt.xlabel('Liczba klastrów (k)')
+    plt.ylabel('WCSS')
+    plt.grid(True)
+    plt.savefig(os.path.join(output_folder, 'KMeans_lok.png'))
+    plt.close()
+
+    #KMeans - silhouette score
+    silhouette_scores_kmeans = []
+    for k in range(2, 11):
+        print(f'Licze: {k}')
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        labels = kmeans.fit_predict(df_cluster_scaled)
+        score = silhouette_score(df_cluster_scaled, labels)
+        silhouette_scores_kmeans.append(score)
+        print(f'KMeans - Liczba klastrów: {k}, Silhouette Score: {score:.4f}')
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(range(2, 11), silhouette_scores_kmeans, marker='o')
+    plt.title('KMeans – Silhouette Score')
+    plt.xlabel('Liczba klastrów (k)')
+    plt.ylabel('Silhouette Score')
+    plt.grid(True)
+    plt.savefig(os.path.join(output_folder, 'KMeans_sil.png'))
+    plt.close()
+
+    #Ward - silhouette score
+    silhouette_scores_ward = []
+    for k in range(2, 11):
+        print(f'Licze: {k}')
+        ward = AgglomerativeClustering(n_clusters=k, linkage='ward')
+        labels = ward.fit_predict(df_cluster_scaled)
+        score = silhouette_score(df_cluster_scaled, labels)
+        silhouette_scores_ward.append(score)
+        print(f'Ward - Liczba klastrów: {k}, Silhouette Score: {score:.4f}')
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(range(2, 11), silhouette_scores_ward, marker='o')
+    plt.title('Ward – Silhouette Score')
+    plt.xlabel('Liczba klastrów (k)')
+    plt.ylabel('Silhouette Score')
+    plt.grid(True)
+    plt.savefig(os.path.join(output_folder, 'Ward_sil.png'))
+    plt.close()
+#endregion
+
+#region klasteryzacja
+if not ANALYSIS_METHODS: exit(0)
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+df['cluster_kmeans'] = kmeans.fit_predict(df_cluster_scaled)
+
+ward = AgglomerativeClustering(n_clusters=3, linkage='ward')
+df['cluster_ward'] = ward.fit_predict(df_cluster_scaled)
+
+cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
+df['kmeans_color'] = df['cluster_kmeans'].map(cluster_colors)
+cluster_colors = {0: 'blue', 1: 'red', 2: 'green'}
+df['ward_color'] = df['cluster_ward'].map(cluster_colors)
+cluster_colors = {1: 'green', 2: 'blue', 3: 'red'}
+df['price_color'] = df['price_category'].map(cluster_colors)
+#endregion
+
+#region obliczanie pokrycia
+df['kmeans_vs_cena_match'] = df['kmeans_color'] == df['price_color']
+df['ward_vs_cena_match'] = df['ward_color'] == df['price_color']
+print(f"Pokrycie KMeans: {df['kmeans_vs_cena_match'].mean()*100}")
+print(f"Pokrycie Ward: {df['ward_vs_cena_match'].mean()*100}")
+#endregion
+
+#region wizualizacja
+def make_plots(x,y):    #x i y to nazywy kolumn
+    cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
+    plt.figure(figsize=(10, 5))
+    sns.scatterplot(x=df[x], y=df[y], hue=df['cluster_kmeans'], palette=cluster_colors, alpha=0.1, edgecolors='none')
+    plt.title(f'K-Means: Klasyfikacja diamentów na podstawie {x} vs {y}')
+    plt.legend(title='Cluster')
+    plt.savefig(os.path.join(output_folder, f'K-Means_{x}_{y}.png'))
+    plt.close()
 
 
-features = ['carat', 'cut', 'color', 'clarity', 'depth', 'table', 'price', 'x', 'y', 'z']
+    cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
+    plt.figure(figsize=(10, 5))
+    sns.scatterplot(x=df[x], y=df[y], hue=df['cluster_ward'], palette=cluster_colors, alpha=0.1, edgecolors='none')
+    plt.title(f'Ward: Klasyfikacja diamentów na podstawie {x} vs {y}')
+    plt.legend(title='Cluster')
+    plt.savefig(os.path.join(output_folder, f'Ward_{x}_{y}.png'))
+    plt.close()
 
-# Skalowanie danych (Standaryzacja: średnia = 0, odchylenie standardowe = 1)
-scaler = StandardScaler()
-df_scaled = scaler.fit_transform(df[features])
+    cluster_colors = {1: 'green', 2: 'blue', 3: 'red'}
+    plt.figure(figsize=(10, 5))
+    sns.scatterplot(x=df[x], y=df[y], hue=df['price_category'], palette=cluster_colors, alpha=0.1, edgecolors='none')
+    plt.title(f'Grupowanie diamentów na podstawie {x} vs {y}')
+    plt.legend(title='Cluster')
+    plt.savefig(os.path.join(output_folder, f'Wykresy_borderless{x}_{y}.png'))
+    plt.close()
 
-# Przekształcamy do DataFrame
-df_scaled = pd.DataFrame(df_scaled, columns=features)
+make_plots('carat','price')
 
-
-
-print(df_scaled.head())  # Podgląd pierwszych 5 wierszy
-print(df_scaled.info())  # Sprawdzenie typów danych i braków
-print(df_scaled.describe())  # Statystyki opisowe
-
-
-
-wcss = []  # Suma błędów wewnątrz klastrów (Within-Cluster Sum of Squares)
-
-# Testujemy od 1 do 10 klastrów
-for i in range(1, 11):
-    kmeans = KMeans(n_clusters=i, random_state=42, n_init=10)
-    kmeans.fit(df_scaled)
-    wcss.append(kmeans.inertia_)  # inertia_ to suma błędów w klastrach
-
-# Wykres metody łokcia
-plt.plot(range(1, 11), wcss, marker='o')
-plt.xlabel('Liczba klastrów (k)')
-plt.ylabel('WCSS')
-plt.title('Metoda łokcia')
-plt.show()
+#endregion
