@@ -18,8 +18,8 @@ output_folder = 'output'
 original_count = df.shape[0]
 df = df[(df['x'] > 0) & (df['y'] > 0) & (df['z'] > 0)]
 removed = original_count-df.shape[0]
-print(f"Usunieto {removed} wierszy")
-print(f"Usunieto {removed/original_count*100}% wierszy")
+print(f"Removed {removed} rows")
+print(f"Removed {removed/original_count*100}% rows")
 
 #region wstępne wykresy
 if GENERATE_CHARTS:
@@ -35,7 +35,7 @@ if GENERATE_CHARTS:
         ax.grid(axis='y', linestyle='-', alpha=0.6)
         ax.set_title(f'Histogram: {col}')
         ax.set_xlabel(col)
-        ax.set_ylabel('Liczba')
+        ax.set_ylabel('Count')
         plt.tight_layout()
 
         fig.savefig(os.path.join(output_folder, f'histogram_{col}.png'))
@@ -51,15 +51,15 @@ if GENERATE_CHARTS:
         q1 = df[col].quantile(0.25)
         q3 = df[col].quantile(0.75)
 
-        ax.axhline(median, color='red', linestyle='--', label='Mediana')  # Mediana
-        ax.axhline(mean, color='green', linestyle='-', alpha=0.6, label='Średnia')  # Średnia
+        ax.axhline(median, color='red', linestyle='--', label='Median')  # Mediana
+        ax.axhline(mean, color='green', linestyle='-', alpha=0.6, label='Mean')  # Średnia
         ax.axhline(q1, color='purple', linestyle='dotted', alpha=0.7, label='Q1 (25%)')  # 1. kwartyl
         ax.axhline(q3, color='brown', linestyle='dotted', alpha=0.7, label='Q3 (75%)')  # 3. kwartyl
         ax.grid(axis='y', linestyle='-', alpha=0.6)
 
         ax.set_title(f'Boxplot: {col}')
         ax.set_xlabel(col)
-        ax.set_ylabel('Wartości')
+        ax.set_ylabel('Values')
         ax.legend()
 
         plt.tight_layout()
@@ -70,7 +70,7 @@ if GENERATE_CHARTS:
         counts = df[col].value_counts()
         fig, ax = plt.subplots(figsize=(6, 6))
         ax.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=90)
-        ax.set_title(f'Wykres kołowy: {col}')
+        ax.set_title(f'Pie chart: {col}')
         plt.tight_layout()
 
         fig.savefig(os.path.join(output_folder, f'pie_{col}.png'))
@@ -87,7 +87,7 @@ if GENERATE_CHARTS:
                      loc='center')
     table.auto_set_font_size(False)
     table.set_fontsize(10)
-    ax.set_title('Podsumowanie statystyczne (min, max, średnia, mediana, odchylenie standardowe, skośność)', fontweight="bold")
+    ax.set_title('Statistical summary (min, max, mean, median, std dev, skewness)', fontweight="bold")
 
     fig.savefig(os.path.join(output_folder, 'statystyki_podsumowanie.png'))
     plt.close(fig)
@@ -152,8 +152,8 @@ if COUNT_CLUSTERS:
 
     plt.figure(figsize=(8, 4))
     plt.plot(range(1, 11), wcss, marker='o')
-    plt.title('KMeans – Metoda łokcia')
-    plt.xlabel('Liczba klastrów (k)')
+    plt.title('KMeans – Elbow method')
+    plt.xlabel('Number of clusters (k)')
     plt.ylabel('WCSS')
     plt.grid(True)
     plt.savefig(os.path.join(output_folder, 'KMeans_lok.png'))
@@ -162,17 +162,17 @@ if COUNT_CLUSTERS:
     #KMeans - silhouette score
     silhouette_scores_kmeans = []
     for k in range(2, 11):
-        print(f'Licze: {k}')
+        print(f'Computing k={k}')
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
         labels = kmeans.fit_predict(df_cluster_scaled)
         score = silhouette_score(df_cluster_scaled, labels, sample_size=10000, random_state=42)
         silhouette_scores_kmeans.append(score)
-        print(f'KMeans - Liczba klastrów: {k}, Silhouette Score: {score:.4f}')
+        print(f'KMeans - clusters: {k}, Silhouette Score: {score:.4f}')
 
     plt.figure(figsize=(8, 4))
     plt.plot(range(2, 11), silhouette_scores_kmeans, marker='o')
     plt.title('KMeans – Silhouette Score')
-    plt.xlabel('Liczba klastrów (k)')
+    plt.xlabel('Clusters (k)')
     plt.ylabel('Silhouette Score')
     plt.grid(True)
     plt.savefig(os.path.join(output_folder, 'KMeans_sil.png'))
@@ -181,17 +181,17 @@ if COUNT_CLUSTERS:
     #Ward - silhouette score
     silhouette_scores_ward = []
     for k in range(2, 11):
-        print(f'Licze: {k}')
+        print(f'Computing k={k}')
         ward = AgglomerativeClustering(n_clusters=k, linkage='ward')
         labels = ward.fit_predict(ward_data)
         score = silhouette_score(ward_data, labels)
         silhouette_scores_ward.append(score)
-        print(f'Ward - Liczba klastrów: {k}, Silhouette Score: {score:.4f}')
+        print(f'Ward - clusters: {k}, Silhouette Score: {score:.4f}')
 
     plt.figure(figsize=(8, 4))
     plt.plot(range(2, 11), silhouette_scores_ward, marker='o')
     plt.title('Ward – Silhouette Score')
-    plt.xlabel('Liczba klastrów (k)')
+    plt.xlabel('Clusters (k)')
     plt.ylabel('Silhouette Score')
     plt.grid(True)
     plt.savefig(os.path.join(output_folder, 'Ward_sil.png'))
@@ -220,8 +220,8 @@ df_ward['price_color'] = df_ward['price_category'].map(cluster_colors)
 #region obliczanie pokrycia
 df['kmeans_vs_cena_match'] = df['kmeans_color'] == df['price_color']
 df_ward['ward_vs_cena_match'] = df_ward['ward_color'] == df_ward['price_color']
-print(f"Pokrycie KMeans: {df['kmeans_vs_cena_match'].mean()*100}")
-print(f"Pokrycie Ward (próbka 10k): {df_ward['ward_vs_cena_match'].mean()*100}")
+print(f"K-Means coverage: {df['kmeans_vs_cena_match'].mean()*100}")
+print(f"Ward coverage (10k sample): {df_ward['ward_vs_cena_match'].mean()*100}")
 #endregion
 
 #region wizualizacja
@@ -230,7 +230,7 @@ def make_plots(x,y, ward_df=None):    #x i y to nazywy kolumn
     cluster_colors = {0: 'red', 1: 'blue', 2: 'green'}
     plt.figure(figsize=(10, 5))
     sns.scatterplot(x=df[x], y=df[y], hue=df['cluster_kmeans'], palette=cluster_colors, alpha=0.1, edgecolors='none')
-    plt.title(f'K-Means: Klasyfikacja diamentów na podstawie {x} vs {y}')
+    plt.title(f'K-Means clustering: {x} vs {y}')
     plt.legend(title='Cluster')
     plt.savefig(os.path.join(output_folder, f'K-Means_{x}_{y}.png'))
     plt.close()
@@ -239,7 +239,7 @@ def make_plots(x,y, ward_df=None):    #x i y to nazywy kolumn
     if ward_df is not None:
         plt.figure(figsize=(10, 5))
         sns.scatterplot(x=ward_df[x], y=ward_df[y], hue=ward_df['cluster_ward'], palette=cluster_colors, alpha=0.1, edgecolors='none')
-        plt.title(f'Ward: Klasyfikacja diamentów na podstawie {x} vs {y} (próbka 10k)')
+        plt.title(f'Ward clustering: {x} vs {y} (próbka 10k)')
         plt.legend(title='Cluster')
         plt.savefig(os.path.join(output_folder, f'Ward_{x}_{y}.png'))
         plt.close()
@@ -247,7 +247,7 @@ def make_plots(x,y, ward_df=None):    #x i y to nazywy kolumn
     cluster_colors = {1: 'green', 2: 'blue', 3: 'red'}
     plt.figure(figsize=(10, 5))
     sns.scatterplot(x=df[x], y=df[y], hue=df['price_category'], palette=cluster_colors, alpha=0.1, edgecolors='none')
-    plt.title(f'Grupowanie diamentów na podstawie {x} vs {y}')
+    plt.title(f'Price groups {x} vs {y}')
     plt.legend(title='Cluster')
     plt.savefig(os.path.join(output_folder, f'Wykresy_borderless{x}_{y}.png'))
     plt.close()
