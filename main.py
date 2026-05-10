@@ -239,7 +239,7 @@ def make_plots(x,y, ward_df=None):    #x i y to nazywy kolumn
     if ward_df is not None:
         plt.figure(figsize=(10, 5))
         sns.scatterplot(x=ward_df[x], y=ward_df[y], hue=ward_df['cluster_ward'], palette=cluster_colors, alpha=0.1, edgecolors='none')
-        plt.title(f'Ward clustering: {x} vs {y} (próbka 10k)')
+        plt.title(f'Ward clustering: {x} vs {y} (10k samples)')
         plt.legend(title='Cluster')
         plt.savefig(os.path.join(output_folder, f'Ward_{x}_{y}.png'))
         plt.close()
